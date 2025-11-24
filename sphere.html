@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Sphere</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+       const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let marker = null;
+        let blinkTime = 0;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        const geometry = new THREE.SphereGeometry(1, 32, 32);
+
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/grid.png');
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(80, 80);
+
+        const material = new THREE.MeshStandardMaterial({
+            map: texture
+        });
+
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+
+        const light = new THREE.DirectionalLight(0xffffff, 0.5);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        camera.position.z = 3;
+
+        window.addEventListener('click', onClick, false);
+
+         function onClick(event) {
+                // 1) compute mouse/raycaster as before…
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(sphere, true);
+
+
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+
+                    // — your existing marker code —
+                    if (marker) scene.remove(marker);
+                    marker = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    marker.position.copy(point);
+                    scene.add(marker);
+                    blinkTime = 0;
+
+                    // — now *inside* the same block, the circle code —
+                    if (scene.getObjectByName("greatCircle")) {
+                        scene.remove(scene.getObjectByName("greatCircle"));
+                    }
+
+                    // direction from center to click
+                    const direction = point.clone().normalize();
+
+                    // pick an “up” vector not parallel to direction
+                    const up = new THREE.Vector3(0, 1, 0);
+                    if (Math.abs(direction.dot(up)) > 0.99) up.set(1, 0, 0);
+
+                    // plane normal and second basis vector
+                    const planeNormal = new THREE.Vector3().crossVectors(direction, up).normalize();
+                    const basis2 = new THREE.Vector3().crossVectors(planeNormal, direction).normalize();
+
+                    // build the great-circle (on the N–S axis)
+                    const segments = 100, radius = 1.01;  // 1.01 to sit just above the sphere
+                    const pts = [];
+                    for (let i = 0; i <= segments; i++) {
+                        const θ = (i / segments) * Math.PI * 2;
+                        const v = direction.clone().multiplyScalar(Math.cos(θ))
+                            .add(basis2.clone().multiplyScalar(Math.sin(θ)))
+                            .multiplyScalar(radius);
+                        pts.push(v);
+                    }
+
+                    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+                    const mat = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+                    const circle = new THREE.LineLoop(geo, mat);
+                    circle.name = "greatCircle";
+                    scene.add(circle);
+                }
+            }
+
+
+        function animate() {
+                requestAnimationFrame(animate);
+
+                if (marker) {
+                    blinkTime += 0.1;
+                    const scale = 1 + 0.3 * Math.sin(blinkTime * 5);
+                    marker.scale.set(scale, scale, scale);
+                }
+
+                renderer.render(scene, camera);
+            }
+
+        animate();
+    </script>
+</body>
+
+</html>
